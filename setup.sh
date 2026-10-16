@@ -62,6 +62,7 @@ PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 CONF
+  mkdir -p /run/sshd  # fehlt auf Ubuntu 24.04 mit socket-aktiviertem SSH
   sshd -t
   systemctl restart ssh
   echo "Login per Passwort ist jetzt aus, nur noch per SSH-Key."
