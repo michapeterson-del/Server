@@ -1,0 +1,47 @@
+# Ersatz für Supabase beim Aufgabenplaner: Postgres + PostgREST (dieselbe
+# REST-Schnittstelle wie Supabase unter /rest/v1/) + nginx als Türsteher,
+# der den API-Key prüft. In Coolify als "Docker Compose" aus diesem Repo
+# deployen (Base directory: /todo-api) und die Variablen unten setzen.
+services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD fehlt}
+      AUTHENTICATOR_PASSWORD: ${AUTHENTICATOR_PASSWORD:?AUTHENTICATOR_PASSWORD fehlt}
+      TZ: Europe/Berlin
+    volumes:
+      - todo-db:/var/lib/postgresql
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_OPENAPI_MODE: disabled
+
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - rest
+    environment:
+      API_KEY: ${API_KEY:?API_KEY fehlt}
+    volumes:
+      - ./nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    expose:
+      - "80"
+
+volumes:
+  todo-db:

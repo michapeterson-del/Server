@@ -1,0 +1,30 @@
+# API_KEY wird beim Start durch den Wert der Umgebungsvariable ersetzt (nginx-Template).
+server {
+    listen 80;
+    client_max_body_size 10m;
+
+    location = / {
+        default_type text/plain;
+        return 200 "Aufgabenplaner-API laeuft\n";
+    }
+
+    # Gleiche Adresse wie bei Supabase: <URL>/rest/v1/tasks
+    location /rest/v1/ {
+        default_type application/json;
+        set $key_ok 0;
+        # CORS-Vorabfragen des Browsers schicken keinen Key mit
+        if ($request_method = OPTIONS) { set $key_ok 1; }
+        if ($http_apikey = "${API_KEY}") { set $key_ok 1; }
+        if ($key_ok = 0) {
+            return 401 '{"message":"Ungueltiger API-Key"}';
+        }
+
+        # Die Clients schicken den Key (wie bei Supabase) auch als Bearer-Token mit.
+        # PostgREST würde ihn als JWT prüfen – der Zugriff ist aber schon über den
+        # apikey-Header geregelt, deshalb wird er hier entfernt.
+        proxy_set_header Authorization "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_pass http://rest:3000/;
+    }
+}
